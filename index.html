@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#14161a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>Cube Timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #14161a;
+    --bg-surface: #1c1f24;
+    --bg-surface-2: #24282f;
+    --line: #2c3038;
+    --text-primary: #f2f0ea;
+    --text-muted: #8b8f98;
+    --text-faint: #565a62;
+    --accent-running: #ff5d3a;
+    --accent-ready: #3ddc84;
+    --accent-dnf: #e2434b;
+    --accent-plus2: #f5b942;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'Manrope', sans-serif;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  #app {
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: env(safe-area-inset-top, 12px) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  }
+
+  /* ---- Header ---- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    flex-shrink: 0;
+  }
+
+  .session-picker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    padding: 6px 4px;
+  }
+  .session-picker svg { opacity: 0.6; }
+
+  .icon-btn {
+    background: var(--bg-surface);
+    border: 1px solid var(--line);
+    color: var(--text-primary);
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn:active { background: var(--bg-surface-2); }
+
+  /* ---- Stats bar ---- */
+  .stats-bar {
+    display: flex;
+    padding: 0 16px 12px;
+    gap: 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .stat {
+    flex: 1;
+    text-align: center;
+    padding: 6px 4px;
+  }
+  .stat + .stat { border-left: 1px solid var(--line); }
+  .stat .val {
+    font-family: 'Space Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    display: block;
+  }
+  .stat .lbl {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+    margin-top: 2px;
+    display: block;
+  }
+
+  /* ---- Timer face ---- */
+  #timerZone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: background-color 0.15s ease;
+    touch-action: none;
+  }
+
+  #digits {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 19vw;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    transition: color 0.15s ease;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #hint {
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.01em;
+  }
+
+  #scramble {
+    position: absolute;
+    top: 18px;
+    left: 20px;
+    right: 20px;
+    text-align: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .zone-running { background: var(--accent-running); }
+  .zone-running #digits { color: #1a0a04; }
+  .zone-running #hint { color: rgba(26,10,4,0.6); }
+  .zone-running #scramble { color: rgba(26,10,4,0.5); }
+
+  .zone-flash { background: var(--accent-ready); }
+  .zone-flash #digits { color: #06210f; }
+  .zone-flash #hint { color: rgba(6,33,15,0.6); }
+
+  /* ---- Times strip ---- */
+  #timesWrap {
+    flex-shrink: 0;
+    border-top: 1px solid var(--line);
+    background: var(--bg-surface);
+  }
+  #timesHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px 6px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+  #timesList {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 0 16px 14px;
+  }
+  .chip {
+    flex-shrink: 0;
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 58px;
+    white-space: nowrap;
+  }
+  .chip .n { font-size: 9px; color: var(--text-faint); font-weight: 500; margin-bottom: 2px; }
+  .chip.dnf { color: var(--accent-dnf); border-color: rgba(226,67,75,0.4); }
+  .chip.plus2 { color: var(--accent-plus2); }
+  .chip.best { color: var(--accent-ready); }
+  .chip.selected { outline: 2px solid var(--text-primary); }
+
+  /* ---- Empty state ---- */
+  .empty-msg { color: var(--text-faint); font-size: 13px; padding: 8px 16px 14px; }
+
+  /* ---- Sheets / overlays ---- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: flex-end;
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    background: var(--bg-surface);
+    border-top: 1px solid var(--line);
+    border-radius: 18px 18px 0 0;
+    width: 100%;
+    padding: 18px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+    transform: translateY(100%);
+    transition: transform 0.2s ease;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  .overlay.open .sheet { transform: translateY(0); }
+  .sheet h3 {
+    margin: 0 0 14px;
+    font-size: 15px;
+    font-weight: 800;
+  }
+  .sheet-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .sheet-row:last-child { border-bottom: none; }
+  .sheet-row span.name { font-weight: 600; font-size: 15px; }
+  .sheet-row span.count { color: var(--text-muted); font-size: 12.5px; margin-left: 8px; }
+  .row-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+  .row-btn.danger { color: var(--accent-dnf); }
+
+  .new-session-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .new-session-form input {
+    flex: 1;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    color: var(--text-primary);
+    font-family: 'Manrope', sans-serif;
+    font-size: 14px;
+  }
+  .new-session-form button {
+    background: var(--text-primary);
+    color: var(--bg-base);
+    border: none;
+    border-radius: 10px;
+    padding: 0 16px;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .action-btn {
+    width: 100%;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--line);
+    color: var(--text-primary);
+    border-radius: 10px;
+    padding: 13px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .action-btn.danger { color: var(--accent-dnf); }
+  .action-btn.amber { color: var(--accent-plus2); }
+  .action-btn.mint { color: var(--accent-ready); }
+
+  #detailValue {
+    font-family: 'Space Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+
+  .theme-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .theme-swatch {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--bg-surface-2);
+    text-align: left;
+  }
+  .theme-swatch.selected { outline: 2px solid var(--text-primary); }
+  .swatch-dot {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .swatch-accent {
+    position: absolute;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    bottom: 1px;
+    right: 1px;
+    border: 1px solid rgba(0,0,0,0.25);
+  }
+  .swatch-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <button class="session-picker" id="sessionPickerBtn">
+      <span id="sessionName">Sessione 1</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <button class="icon-btn" id="settingsBtn" aria-label="Sessioni">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    </button>
+    <button class="icon-btn" id="themeBtn" aria-label="Temi" style="margin-left:8px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="6" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="10" cy="19" r="1.2" fill="currentColor" stroke="none"/><path d="M12 2a10 10 0 100 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.3-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.4c1.7 0 3.1-1.4 3.1-3.1C20.5 6.6 16.7 2 12 2z"/></svg>
+    </button>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat"><span class="val" id="statBest">–</span><span class="lbl">best</span></div>
+    <div class="stat"><span class="val" id="statAo5">–</span><span class="lbl">ao5</span></div>
+    <div class="stat"><span class="val" id="statAo12">–</span><span class="lbl">ao12</span></div>
+    <div class="stat"><span class="val" id="statMean">–</span><span class="lbl">media</span></div>
+    <div class="stat"><span class="val" id="statCount">0</span><span class="lbl">solve</span></div>
+  </div>
+
+  <div id="timerZone">
+    <div id="scramble"></div>
+    <div id="digits">0.00</div>
+    <div id="hint">tocca per iniziare</div>
+  </div>
+
+  <div id="timesWrap">
+    <div id="timesHead">
+      <span id="timesLabel">Tempi di questa sessione</span>
+    </div>
+    <div id="timesList"></div>
+  </div>
+</div>
+
+<!-- Sessions overlay -->
+<div class="overlay" id="sessionsOverlay">
+  <div class="sheet">
+    <h3>Sessioni</h3>
+    <div id="sessionListWrap"></div>
+    <form class="new-session-form" id="newSessionForm">
+      <input type="text" id="newSessionInput" placeholder="Nome nuova sessione" maxlength="30">
+      <button type="submit">Crea</button>
+    </form>
+    <button class="action-btn" id="btnExport" style="margin-top:16px;">Esporta backup (copia testo)</button>
+    <button class="action-btn" id="btnImport">Importa backup</button>
+    <div id="backupStatus" style="font-size:12px;color:var(--text-muted);margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- Time detail overlay -->
+<div class="overlay" id="detailOverlay">
+  <div class="sheet">
+    <h3>Modifica tempo</h3>
+    <div id="detailValue">0.00</div>
+    <button class="action-btn amber" id="btnPlus2">+2</button>
+    <button class="action-btn danger" id="btnDnf">DNF</button>
+    <button class="action-btn mint" id="btnClearPenalty">Rimuovi penalità</button>
+    <button class="action-btn danger" id="btnDeleteTime">Elimina tempo</button>
+  </div>
+</div>
+
+<!-- Theme picker overlay -->
+<div class="overlay" id="themeOverlay">
+  <div class="sheet">
+    <h3>Tema</h3>
+    <div class="theme-grid" id="themeGrid"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const STORE_KEY = 'cubetimer:data';
+  let data = { sessions: [{ id: 's1', name: 'Sessione 1', times: [] }], currentSessionId: 's1', theme: 'graphite' };
+  let loaded = false;
+
+  const $ = (id) => document.getElementById(id);
+  function makeId(prefix) {
+    return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+  const digitsEl = $('digits'), zoneEl = $('timerZone'), hintEl = $('hint'), scrambleEl = $('scramble');
+
+  // ---------- Persistence (plain localStorage — works fully offline) ----------
+  async function load() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (raw) data = JSON.parse(raw);
+    } catch (e) {
+      console.warn('Could not read saved data, starting fresh:', e);
+    }
+    loaded = true;
+    applyTheme(data.theme || 'graphite');
+    render();
+  }
+
+  async function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.warn('Could not save data (storage may be full or disabled):', e);
+    }
+  }
+
+  function currentSession() {
+    return data.sessions.find(s => s.id === data.currentSessionId) || data.sessions[0];
+  }
+
+  // ---------- Timer state machine ----------
+  let state = 'idle'; // idle | running | flash
+  let startTs = 0;
+  let rafId = null;
+
+  function fmt(ms) {
+    const totalCs = Math.round(ms / 10);
+    const cs = totalCs % 100;
+    const totalSec = Math.floor(totalCs / 100);
+    if (totalSec >= 60) {
+      const min = Math.floor(totalSec / 60);
+      const sec = totalSec % 60;
+      return min + ':' + String(sec).padStart(2, '0') + '.' + String(cs).padStart(2, '0');
+    }
+    return totalSec + '.' + String(cs).padStart(2, '0');
+  }
+
+  function setDigits(text) {
+    digitsEl.textContent = text;
+    digitsEl.style.fontSize = text.length > 5 ? '14vw' : '19vw';
+  }
+
+  function tick() {
+    const elapsed = Date.now() - startTs;
+    setDigits(fmt(elapsed));
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function startTimer() {
+    state = 'running';
+    startTs = Date.now();
+    zoneEl.className = 'zone-running';
+    hintEl.textContent = 'tocca per fermare';
+    scrambleEl.style.display = 'none';
+    tick();
+  }
+
+  function stopTimer() {
+    cancelAnimationFrame(rafId);
+    const elapsed = Date.now() - startTs;
+    const session = currentSession();
+    const entry = { id: makeId('t'), value: elapsed, penalty: null, ts: Date.now() };
+    session.times.push(entry);
+    save();
+
+    state = 'flash';
+    zoneEl.className = 'zone-flash';
+    setDigits(fmt(elapsed));
+    hintEl.textContent = 'salvato';
+    renderStats();
+    renderTimesList();
+
+    setTimeout(() => {
+      state = 'idle';
+      zoneEl.className = '';
+      hintEl.textContent = 'tocca per iniziare';
+      scrambleEl.style.display = '';
+    }, 350);
+  }
+
+  zoneEl.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (state === 'idle' || state === 'flash') {
+      cancelAnimationFrame(rafId);
+      startTimer();
+    } else if (state === 'running') {
+      stopTimer();
+    }
+  });
+
+  // ---------- Stats ----------
+  function effectiveValue(t) {
+    // returns ms, or Infinity for DNF (for sorting/trimming), null-safe
+    if (t.penalty === 'dnf') return Infinity;
+    if (t.penalty === 'plus2') return t.value + 2000;
+    return t.value;
+  }
+
+  function displayValue(t) {
+    if (t.penalty === 'dnf') return 'DNF';
+    const v = effectiveValue(t);
+    return fmt(v) + (t.penalty === 'plus2' ? '+' : '');
+  }
+
+  function average(times) {
+    // WCA-style: drop best & worst if n>=5, else plain mean. DNF handling included.
+    const n = times.length;
+    if (n === 0) return null;
+    const vals = times.map(effectiveValue);
+    const dnfCount = vals.filter(v => v === Infinity).length;
+    if (n < 5) {
+      if (dnfCount > 0) return null;
+      const sum = vals.reduce((a, b) => a + b, 0);
+      return sum / n;
+    }
+    if (dnfCount >= 2) return Infinity; // DNF average
+    const sorted = [...vals].sort((a, b) => a - b);
+    const trimmed = sorted.slice(1, sorted.length - 1);
+    if (trimmed.some(v => v === Infinity)) return Infinity;
+    const sum = trimmed.reduce((a, b) => a + b, 0);
+    return sum / trimmed.length;
+  }
+
+  function fmtStat(ms) {
+    if (ms === null) return '–';
+    if (ms === Infinity) return 'DNF';
+    return fmt(ms);
+  }
+
+  function renderStats() {
+    const session = currentSession();
+    const times = session.times;
+    const vals = times.map(effectiveValue).filter(v => v !== Infinity);
+    const best = vals.length ? Math.min(...vals) : null;
+    const meanAll = times.length ? average(times.slice(0, times.length < 5 ? times.length : times.length)) : null;
+
+    $('statCount').textContent = times.length;
+    $('statBest').textContent = best === null ? '–' : fmt(best);
+
+    const last5 = times.slice(-5);
+    $('statAo5').textContent = last5.length === 5 ? fmtStat(average(last5)) : '–';
+
+    const last12 = times.slice(-12);
+    $('statAo12').textContent = last12.length === 12 ? fmtStat(average(last12)) : '–';
+
+    if (vals.length) {
+      const sum = vals.reduce((a, b) => a + b, 0);
+      $('statMean').textContent = fmt(sum / vals.length);
+    } else {
+      $('statMean').textContent = '–';
+    }
+  }
+
+  // ---------- Times strip ----------
+  let selectedTimeId = null;
+
+  function renderTimesList() {
+    const session = currentSession();
+    const wrap = $('timesList');
+    wrap.innerHTML = '';
+    if (session.times.length === 0) {
+      wrap.innerHTML = '<div class="empty-msg">Ancora nessun tempo — tocca lo schermo per partire</div>';
+      return;
+    }
+    const vals = session.times.map(effectiveValue).filter(v => v !== Infinity);
+    const bestVal = vals.length ? Math.min(...vals) : null;
+
+    session.times.forEach((t, idx) => {
+      const chip = document.createElement('div');
+      let cls = 'chip';
+      if (t.penalty === 'dnf') cls += ' dnf';
+      else if (t.penalty === 'plus2') cls += ' plus2';
+      else if (bestVal !== null && effectiveValue(t) === bestVal) cls += ' best';
+      chip.className = cls;
+      chip.innerHTML = `<span class="n">${idx + 1}</span>${displayValue(t)}`;
+      chip.addEventListener('click', () => openDetail(t.id));
+      wrap.appendChild(chip);
+    });
+    wrap.scrollLeft = wrap.scrollWidth;
+  }
+
+  // ---------- Detail sheet ----------
+  function openDetail(timeId) {
+    selectedTimeId = timeId;
+    const session = currentSession();
+    const t = session.times.find(x => x.id === timeId);
+    if (!t) return;
+    $('detailValue').textContent = displayValue(t);
+    $('detailOverlay').classList.add('open');
+  }
+  function closeDetail() { $('detailOverlay').classList.remove('open'); selectedTimeId = null; }
+
+  $('detailOverlay').addEventListener('click', (e) => { if (e.target.id === 'detailOverlay') closeDetail(); });
+
+  $('btnPlus2').addEventListener('click', () => {
+    const t = currentSession().times.find(x => x.id === selectedTimeId);
+    if (t) { t.penalty = 'plus2'; save(); renderStats(); renderTimesList(); closeDetail(); }
+  });
+  $('btnDnf').addEventListener('click', () => {
+    const t = currentSession().times.find(x => x.id === selectedTimeId);
+    if (t) { t.penalty = 'dnf'; save(); renderStats(); renderTimesList(); closeDetail(); }
+  });
+  $('btnClearPenalty').addEventListener('click', () => {
+    const t = currentSession().times.find(x => x.id === selectedTimeId);
+    if (t) { t.penalty = null; save(); renderStats(); renderTimesList(); closeDetail(); }
+  });
+  $('btnDeleteTime').addEventListener('click', () => {
+    const session = currentSession();
+    session.times = session.times.filter(x => x.id !== selectedTimeId);
+    save(); renderStats(); renderTimesList(); closeDetail();
+  });
+
+  // ---------- Sessions sheet ----------
+  function renderSessionList() {
+    const wrap = $('sessionListWrap');
+    wrap.innerHTML = '';
+    data.sessions.forEach(s => {
+      const row = document.createElement('div');
+      row.className = 'sheet-row';
+      const isCurrent = s.id === data.currentSessionId;
+      row.innerHTML = `
+        <div>
+          <span class="name">${s.name}${isCurrent ? ' •' : ''}</span>
+          <span class="count">${s.times.length} solve</span>
+        </div>
+        <div>
+          ${data.sessions.length > 1 ? '<button class="row-btn danger" data-del="' + s.id + '">elimina</button>' : ''}
+        </div>
+      `;
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('[data-del]')) return;
+        data.currentSessionId = s.id;
+        save();
+        render();
+        closeSessions();
+      });
+      const delBtn = row.querySelector('[data-del]');
+      if (delBtn) {
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!confirm(`Eliminare "${s.name}" e tutti i suoi tempi?`)) return;
+          data.sessions = data.sessions.filter(x => x.id !== s.id);
+          if (data.currentSessionId === s.id) data.currentSessionId = data.sessions[0].id;
+          save();
+          render();
+          renderSessionList();
+        });
+      }
+      wrap.appendChild(row);
+    });
+  }
+
+  function openSessions() { renderSessionList(); $('sessionsOverlay').classList.add('open'); }
+  function closeSessions() { $('sessionsOverlay').classList.remove('open'); }
+
+  $('sessionPickerBtn').addEventListener('click', openSessions);
+  $('settingsBtn').addEventListener('click', openSessions);
+  $('sessionsOverlay').addEventListener('click', (e) => { if (e.target.id === 'sessionsOverlay') closeSessions(); });
+
+  $('newSessionForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = $('newSessionInput');
+    const name = input.value.trim();
+    if (!name) return;
+    const id = makeId('s');
+    data.sessions.push({ id, name, times: [] });
+    data.currentSessionId = id;
+    input.value = '';
+    save();
+    render();
+    renderSessionList();
+  });
+
+  // ---------- Manual backup (fallback if auto-save is unreliable) ----------
+  $('btnExport').addEventListener('click', async () => {
+    const text = JSON.stringify(data);
+    try {
+      await navigator.clipboard.writeText(text);
+      $('backupStatus').textContent = 'Copiato negli appunti — incollalo da qualche parte per conservarlo.';
+    } catch (e) {
+      $('backupStatus').textContent = 'Copia manuale:';
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.width = '100%';
+      ta.style.marginTop = '8px';
+      ta.rows = 4;
+      ta.readOnly = true;
+      $('backupStatus').after(ta);
+      ta.select();
+    }
+  });
+
+  $('btnImport').addEventListener('click', () => {
+    const text = prompt('Incolla qui il testo di backup:');
+    if (!text) return;
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed.sessions || !parsed.currentSessionId) throw new Error('formato non valido');
+      data = parsed;
+      save();
+      render();
+      renderSessionList();
+      $('backupStatus').textContent = 'Backup importato.';
+    } catch (e) {
+      $('backupStatus').textContent = 'Testo non valido, riprova.';
+    }
+  });
+
+  // ---------- Themes ----------
+  const THEMES = [
+    { id: 'graphite', name: 'Graphite', vars: { '--bg-base': '#14161a', '--bg-surface': '#1c1f24', '--bg-surface-2': '#24282f', '--line': '#2c3038', '--text-primary': '#f2f0ea', '--text-muted': '#8b8f98', '--text-faint': '#565a62', '--accent-running': '#ff5d3a', '--accent-ready': '#3ddc84', '--accent-dnf': '#e2434b', '--accent-plus2': '#f5b942' } },
+    { id: 'nord', name: 'Nord Frost', vars: { '--bg-base': '#1b2129', '--bg-surface': '#232b35', '--bg-surface-2': '#2c3541', '--line': '#384352', '--text-primary': '#e7edf3', '--text-muted': '#8e9dae', '--text-faint': '#57626f', '--accent-running': '#ef8354', '--accent-ready': '#6fd6b0', '--accent-dnf': '#e0637a', '--accent-plus2': '#e8bb5e' } },
+    { id: 'violet', name: 'Midnight Violet', vars: { '--bg-base': '#17131f', '--bg-surface': '#201a2b', '--bg-surface-2': '#2a2236', '--line': '#372c46', '--text-primary': '#f1ecf9', '--text-muted': '#9a8fb0', '--text-faint': '#5f5674', '--accent-running': '#ff6e6e', '--accent-ready': '#56e0b0', '--accent-dnf': '#f04d6a', '--accent-plus2': '#f2b84f' } },
+    { id: 'forest', name: 'Forest Moss', vars: { '--bg-base': '#131a13', '--bg-surface': '#1c261c', '--bg-surface-2': '#263323', '--line': '#33422f', '--text-primary': '#eef3e6', '--text-muted': '#93a487', '--text-faint': '#5c6a54', '--accent-running': '#ff8c42', '--accent-ready': '#8de05a', '--accent-dnf': '#e2545a', '--accent-plus2': '#f0c14b' } },
+    { id: 'clay', name: 'Sunset Clay', vars: { '--bg-base': '#1c1512', '--bg-surface': '#261c17', '--bg-surface-2': '#32251e', '--line': '#443328', '--text-primary': '#f6ede4', '--text-muted': '#b09484', '--text-faint': '#6e5a4d', '--accent-running': '#ff6b4a', '--accent-ready': '#5fd98a', '--accent-dnf': '#e2454a', '--accent-plus2': '#f2a83f' } },
+    { id: 'ocean', name: 'Ocean Deep', vars: { '--bg-base': '#0e191f', '--bg-surface': '#142631', '--bg-surface-2': '#1b3240', '--line': '#234153', '--text-primary': '#e7f2f5', '--text-muted': '#83a3b0', '--text-faint': '#4f6b76', '--accent-running': '#ff7659', '--accent-ready': '#4fd6c4', '--accent-dnf': '#ea5468', '--accent-plus2': '#f2bb4f' } },
+    { id: 'neon', name: 'Neon Arcade', vars: { '--bg-base': '#0a0a0d', '--bg-surface': '#131318', '--bg-surface-2': '#1c1c24', '--line': '#2a2a35', '--text-primary': '#f5f5fa', '--text-muted': '#8f8fa8', '--text-faint': '#55556b', '--accent-running': '#ff2e88', '--accent-ready': '#39ffb0', '--accent-dnf': '#ff3b3b', '--accent-plus2': '#ffd23f' } },
+    { id: 'mono', name: 'Mono Slate', vars: { '--bg-base': '#131313', '--bg-surface': '#1c1c1c', '--bg-surface-2': '#242424', '--line': '#333333', '--text-primary': '#f2f2f2', '--text-muted': '#8f8f8f', '--text-faint': '#5a5a5a', '--accent-running': '#e6e6e6', '--accent-ready': '#a8d9c5', '--accent-dnf': '#d97b7b', '--accent-plus2': '#d9c27b' } },
+    { id: 'cherry', name: 'Cherry Noir', vars: { '--bg-base': '#180a0d', '--bg-surface': '#221014', '--bg-surface-2': '#2d151a', '--line': '#402028', '--text-primary': '#f7e9ec', '--text-muted': '#b8828e', '--text-faint': '#6e4750', '--accent-running': '#ff5470', '--accent-ready': '#5fd992', '--accent-dnf': '#ff2f4f', '--accent-plus2': '#f2a83f' } },
+    { id: 'daylight', name: 'Daylight', vars: { '--bg-base': '#f7f5f0', '--bg-surface': '#ffffff', '--bg-surface-2': '#eeeae2', '--line': '#ddd7cc', '--text-primary': '#201d19', '--text-muted': '#6b6459', '--text-faint': '#a39c8f', '--accent-running': '#d94f2b', '--accent-ready': '#1f9e5c', '--accent-dnf': '#d1293a', '--accent-plus2': '#b8790f' } },
+  ];
+
+  function applyTheme(id) {
+    const theme = THEMES.find(t => t.id === id) || THEMES[0];
+    Object.entries(theme.vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
+    data.theme = theme.id;
+  }
+
+  function renderThemeGrid() {
+    const grid = $('themeGrid');
+    grid.innerHTML = '';
+    THEMES.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = 'theme-swatch' + (data.theme === t.id ? ' selected' : '');
+      btn.innerHTML = `<span class="swatch-dot" style="background:${t.vars['--bg-base']}"><span class="swatch-accent" style="background:${t.vars['--accent-running']}"></span></span><span class="swatch-name">${t.name}</span>`;
+      btn.addEventListener('click', () => {
+        applyTheme(t.id);
+        save();
+        renderThemeGrid();
+      });
+      grid.appendChild(btn);
+    });
+  }
+
+  function openTheme() { renderThemeGrid(); $('themeOverlay').classList.add('open'); }
+  function closeTheme() { $('themeOverlay').classList.remove('open'); }
+  $('themeBtn').addEventListener('click', openTheme);
+  $('themeOverlay').addEventListener('click', (e) => { if (e.target.id === 'themeOverlay') closeTheme(); });
+
+  // ---------- Render ----------
+  function render() {
+    if (!loaded) return;
+    const session = currentSession();
+    $('sessionName').textContent = session.name;
+    renderStats();
+    renderTimesList();
+  }
+
+  load();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
